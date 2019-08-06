@@ -15,6 +15,7 @@
 #import "STPPaymentIntentAction.h"
 #import "STPPaymentIntentActionRedirectToURL.h"
 #import "STPSource.h"
+#import "STPSourceWeChatPayDetails.h"
 #import "STPURLCallbackHandler.h"
 #import "STPWeakStrongMacros.h"
 #import "NSError+Stripe.h"
@@ -93,6 +94,32 @@ typedef void (^STPBoolCompletionBlock)(BOOL success);
                                     completion(paymentIntent.clientSecret, error);
                                 }];
 }
+
+- (nullable instancetype)initWithWeChatPaySource:(STPSource *)source
+                                      completion:(STPRedirectContextSourceCompletionBlock)completion {
+    
+    if (source.type != STPSourceTypeWeChatPay
+        || !(source.status == STPSourceStatusPending ||
+             source.status == STPSourceStatusChargeable)) {
+            return nil;
+        }
+    
+    NSURL *nativeRedirectURL = [[self class] nativeRedirectURLForSource:source];
+    // Construct the returnURL:
+    //   - nativeRedirectURL looks like "weixin://app/MERCHANT_APP_ID/pay/?..."
+    //   - the WeChat app will redirect back using a URL like "MERCHANT_APP_ID://pay/?..."
+    NSString *merchantAppID = nativeRedirectURL.pathComponents[1];
+    NSURL *returnURL = [NSURL URLWithString:[NSString stringWithFormat:@"%@://pay/", merchantAppID]];
+
+    self = [self initWithNativeRedirectURL:nativeRedirectURL
+                               redirectURL:nil
+                                 returnURL:returnURL
+                                completion:^(NSError * _Nullable error) {
+                                    completion(source.stripeID, source.clientSecret, error);
+                                }];
+    return self;
+}
+
 
 /**
  Failable initializer for the general case of STPRedirectContext, some URLs and a completion block.
@@ -198,6 +225,14 @@ typedef void (^STPBoolCompletionBlock)(BOOL success);
 }
 
 - (void)startSafariAppRedirectFlow {
+    if (self.state == STPRedirectContextStateNotStarted) {
+        self.state = STPRedirectContextStateInProgress;
+        [self subscribeToURLAndForegroundNotifications];
+        [[UIApplication sharedApplication] openURL:self.redirectURL];
+    }
+}
+
+- (void)startWeChatPayAppRedirectFlow {
     if (self.state == STPRedirectContextStateNotStarted) {
         self.state = STPRedirectContextStateInProgress;
         [self subscribeToURLAndForegroundNotifications];
@@ -380,6 +415,8 @@ typedef void (^STPBoolCompletionBlock)(BOOL success);
         case STPSourceTypeAlipay:
             nativeURLString = source.details[@"native_url"];
             break;
+        case STPSourceTypeWeChatPay:
+            nativeURLString = source.weChatPayDetails.weChatAppURL;
         default:
             // All other sources currently have no native url support
             break;
