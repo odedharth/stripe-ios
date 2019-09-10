@@ -22,7 +22,7 @@
         [self setBackgroundImage:enabledImage forState:UIControlStateNormal barMetrics:UIBarMetricsDefault];
         [self setBackgroundImage:disabledImage forState:UIControlStateDisabled barMetrics:UIBarMetricsDefault];
     }
-    
+
     self.tintColor = self.enabled ? theme.accentColor : theme.secondaryForegroundColor;
     [self setTitleTextAttributes:@{
                                    NSFontAttributeName: self.style == UIBarButtonItemStylePlain ? theme.font : theme.emphasisFont,
@@ -34,9 +34,13 @@
                                    NSForegroundColorAttributeName: theme.secondaryForegroundColor,
                                    }
                         forState:UIControlStateDisabled];
+        [self setTitleTextAttributes:@{
+               NSFontAttributeName: self.style == UIBarButtonItemStylePlain ? theme.font : theme.emphasisFont,
+               NSForegroundColorAttributeName: theme.accentColor,
+               }
+    forState:UIControlStateHighlighted];
 }
 
 @end
 
 void linkUIBarButtonItemCategory(void){}
-
